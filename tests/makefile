@@ -1,2 +1,2 @@
-SignalTest:
-	python3 -m unittest test.py
+dataDownload:
+	python3 -m unittest test.TestConvBond.test_DataLoader()

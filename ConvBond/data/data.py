@@ -16,7 +16,7 @@ from typing import Union, List
 from abc import abstractclassmethod
 from sqlalchemy import create_engine
 from datetime import date, datetime, timedelta
-from ._data_config import _data_path
+from .._config import _data_path
 
 trade_dates = ts.pro_api().trade_cal()
 trade_dates.set_index('cal_date', inplace=True)
@@ -108,16 +108,16 @@ class CBData(Data):
             tmp_date += day
 
         df = pd.concat(df_list, ignore_index=True)
-        df.set_index(keys=['ts_code','trade_date'], inplace=True)
         ### save to feathers
         file_name = f'{_data_path}/{self.data_type}/cb_daily.feather'
         if os.path.exists(file_name):
             #### check if the old_df already exists, if does, update the data
+            df.set_index(keys=['ts_code','trade_date'], inplace=True)
             old_df = pd.read_feather(file_name)
             old_df.set_index(keys=['ts_code','trade_date'], inplace=True)
             index_duplicate = old_df.index.intersection(df.index)
             old_df.drop(index=index_duplicate, inplace=True, errors='ignore')
-            pd.concat([old_df,df]).reset_index().to
+            pd.concat([old_df,df]).reset_index().to_feather(file_name)
         else: 
             df.to_feather(file_name)
         
@@ -179,17 +179,17 @@ class CBData(Data):
                                        "guarantor","guarantee_type","issue_rating","newest_rating", 
                                        "rating_comp"])
         df = self.api.cb_basic(ts_code=ts_code, list_date=list_date, exchange=exchange, fields=data_fields)
-
-        df.set_index(keys=['ts_code'], inplace=True)
+        
         ### save to feathers
         file_name = f'{_data_path}/{self.data_type}/cb_basic.feather'
         if os.path.exists(file_name):
             #### check if the old_df already exists, if does, update the data
+            df.set_index(keys=['ts_code'], inplace=True)
             old_df = pd.read_feather(file_name)
             old_df.set_index(keys=['ts_code'], inplace=True)
             index_duplicate = old_df.index.intersection(df.index)
             old_df.drop(index=index_duplicate, inplace=True, errors='ignore')
-            pd.concat([old_df,df]).to_feather(file_name)
+            pd.concat([old_df,df]).reset_index().to_feather(file_name)
         else: 
             df.to_feather(file_name)
         

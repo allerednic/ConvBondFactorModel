@@ -1,19 +1,20 @@
+import os, sys
 import numpy as np
 import pandas as pd
-import os, sys
-sys.path.append('C:\\users\\yangc\\Downloads\\ConvBond')
-import bondtest
-from bondtest.dataloader import  DataLoader
 import unittest
 
-data = DataLoader(fields='*')
-data.set_database( database='ConvBond.pkl')
-raw_df = data.get_data(date=None)
-print(raw_df.columns)
+from pathlib import Path
+proj_path = Path(__file__).parent.parent
+sys.path.insert(0, str(proj_path))
+from ConvBond.data import CBData
 
-clas TestConvBond(unittest.TestCase):
+
+
+
+class TestConvBond(unittest.TestCase):
     def test_DataLoader(self):
         '''
         Function:
         '''
-        
+        data = CBData()
+        data.cb_basic()
