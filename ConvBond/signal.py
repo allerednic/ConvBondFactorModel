@@ -7,18 +7,20 @@ Function:
     define the signal class
     and the signal test methods
 '''
+
 import numbers
+import pandas_bokeh
 import numpy as np
 import pandas as pd
-from datetime import date, datetime
-from abc import ABC, abstractmethod
-# from .dataloader import DataLoader
-from .lib.utils import *
-
-import pandas_bokeh
+import datetime as dt
 import seaborn as sns
 import matplotlib.pyplot as plt
 from copy import deepcopy
+from abc import ABC, abstractmethod
+
+from .data import Data
+from .lib.utils import *
+
 from bokeh.plotting import figure, output_file, show
 from bokeh.models import ColumnDataSource, HoverTool
 from bokeh.layouts import  column
@@ -29,10 +31,8 @@ output_notebook(INLINE)
 
 
 class Signal:
-    _DataPath = {'ConvBond': '/media/Data/Programs/ConvBond/',
-                 'Stock': '/media/Data/StockData',
-                 'Future':'/media/Data/FutureDate'}
-    # data = DataLoader(fields='*')
+
+
     def __init__(self, database):
         self.database = database
         Signal.data.set_database(database)
@@ -40,7 +40,7 @@ class Signal:
         self.factor = pd.DataFrame()
     
     @abstractmethod
-    def gen_sig(self, start: datetime, end:datetime=None):
+    def gen_sig(self, start: dt.datetime, end:dt.datetime=None):
         '''
         generate dataframe of signals
         '''
@@ -130,7 +130,7 @@ class Signal:
         '''
         pass
 
-    def group_analysis(self, start:datetime, end:datetime=None,  num: int=5, chg='close', title:str="") -> pd.DataFrame:
+    def group_analysis(self, start:dt.datetime, end:dt.datetime=None,  num: int=5, chg='close', title:str="") -> pd.DataFrame:
         '''
         group analysis of the factor
         :num: number of groups.
@@ -165,7 +165,7 @@ class Signal:
         (result+1).cumprod().plot_bokeh.line(figsize=(800,600), title=title)
         return result
 
-    def IC_IR(self, start:datetime, end:datetime=None) -> pd.DataFrame:
+    def IC_IR(self, start:dt.datetime, end:dt.datetime=None) -> pd.DataFrame:
         '''
         Function:
             Calculate the information ratio and information coefficient of 
@@ -176,7 +176,7 @@ class Signal:
         pass
 
 
-    def longshort_analysis(self, start:datetime, end:datetime=None,  num: int=5,  title: str='') -> pd.DataFrame:
+    def longshort_analysis(self, start:dt.datetime, end:dt.datetime=None,  num: int=5,  title: str='') -> pd.DataFrame:
         '''
         Group the bonds according to the signal value, Long the top and Short 
         the lowest level, and get the performance of the portfolio.
@@ -213,7 +213,7 @@ class Signal:
         display(backtest_result_df)
         return result
 
-    def top_N_portfolio(self, start:datetime, end:datetime=None,  N:int=10, freq:int=1,  title :str='') -> pd.DataFrame:
+    def top_N_portfolio(self, start:dt.datetime, end:dt.datetime=None,  N:int=10, freq:int=1,  title :str='') -> pd.DataFrame:
         '''
         '''
         ret_df = deepcopy(self.data[['secID','tradeDate', 'chgPct']])
@@ -238,7 +238,7 @@ class Signal:
         df = pd.DataFrame(backtest_result_dict, index=[0])
         df.set_index('Params', inplace=True)
         display(df)
-        p = figure(x_range = [datetime(2019,1,1), datetime(2022,6,30)], x_axis_type='datetime', plot_width=1000, plot_height=400, title='30 lowest price bonds')
+        p = figure(x_range = [dt.datetime(2019,1,1), dt.datetime(2022,6,30)], x_axis_type='datetime', plot_width=1000, plot_height=400, title='30 lowest price bonds')
         source = ColumnDataSource(dict(
                 x=cum_ret.index,
                 y=cum_ret.values,

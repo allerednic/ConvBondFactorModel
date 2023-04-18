@@ -22,7 +22,26 @@ def Singleton(cls):
 def filtTopQuantile(factor: pd.DataFrame,q: float=0.5) ->pd.DataFrame:
     return factor.apply(lambda x:x<=x.quantile(q) ,axis=1)
 
-    
+def merge_force_suffix(left, right, **kwargs):
+    '''
+    Function:
+        Merge two dataframes where the column name suffix is forced
+    '''
+    on_col = kwargs['on']
+    suffix_tupple = kwargs['suffixes']
+
+    def suffix_col(col, suffix):
+        if col != on_col:
+            return str(col) + suffix
+        else:
+            return col
+
+    left_suffixed = left.rename(columns=lambda x: suffix_col(x, suffix_tupple[0]))
+    right_suffixed = right.rename(columns=lambda x: suffix_col(x, suffix_tupple[1]))
+    del kwargs['suffixes']
+    return pd.merge(left_suffixed, right_suffixed, **kwargs)
+
+
 # 取排名最小的N个标的，用bool值表示
 def filtTopN(factor: pd.DataFrame, N: int=20)->pd.DataFrame:
     return factor.apply(lambda x:x.rank(method='first')<=N,axis=1)

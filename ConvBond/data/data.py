@@ -12,10 +12,10 @@ Data should be stored in the form ConvBond.Daily.[Open,High,Low...]
 import os
 import pandas as pd
 import tushare as ts
+import datetime as dt
 from typing import Union, List
 from abc import abstractclassmethod
 from sqlalchemy import create_engine
-from datetime import date, datetime, timedelta
 from .._config import _data_path
 
 trade_dates = ts.pro_api().trade_cal()
@@ -69,7 +69,7 @@ class CBData(Data):
         df = pd.read_sql(f'select {data_fields} from {table}', engine)
         return df
     
-    def cb_daily(self, start_date:str, end_date:str = f'{date.today():%Y%m%d}'):
+    def cb_daily(self, start_date:str, end_date:str = f'{dt.date.today():%Y%m%d}'):
         '''
         Function:
             Download daily data using pro_api. The data should be stored in format feather.
@@ -92,17 +92,32 @@ class CBData(Data):
             
         '''
 
-        tmp_date = datetime(start_date, '%Y%m%d').date()
-        start_date = datetime(end_date, '%Y%m%d').date()
+        start_date = dt.datetime.strptime(start_date, '%Y%m%d').date()
+        tmp_date = start_date
+        end_date = dt.datetime.strptime(end_date, '%Y%m%d').date()
 
-        day = timedelta(days=1)
+        day = dt.timedelta(days=1)
         df_list = []
-        data_fields = ['ts_coode', 'trade_date', 'pre_close', 'open','high',
+        data_fields = ['ts_code', 'trade_date', 'pre_close', 'open','high',
                         'low', 'close','change', 'pct_chg', 'vol', 'amount',
                         'bond_value', 'bond_over_rate', 'cb_value', 'cb_over_rate']
         while tmp_date <= end_date:
             if trade_dates.loc[tmp_date.strftime('%Y%m%d'),'is_open']:
                 tmp_df = self.api.cb_daily(trade_date=tmp_date.strftime('%Y%m%d'), fields=data_fields)
+                ### get the corresponding stk daily bar data
+                basic_data = self.api.cb_basic(fields=['ts_code', 'stk_code'])
+
+                tmp_df = tmp_df.join(basic_data.set_index(keys='ts_code'), on='ts_code', how='left')
+                stk_daily = self.api.daily(trade_date=tmp_date.strftime('%Y%m%d'), 
+                                           ts_code=','.join(tmp_df.stk_code),
+                                           fields = data_fields[:11])
+                stk_daily.rename(columns={'ts_code':'stk_code'},inplace=True)
+                try:
+                    stk_daily.drop(columns=['trade_date'],inplace=True)
+                except:
+                    print(tmp_date)
+                    import pdb; pdb.set_trace()
+                tmp_df = pd.merge(tmp_df, stk_daily, on='stk_code', how='outer', suffixes=('', '_stk'))
                 df_list.append(tmp_df)
             
             tmp_date += day
