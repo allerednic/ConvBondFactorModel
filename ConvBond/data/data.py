@@ -16,6 +16,8 @@ import datetime as dt
 from typing import Union, List
 from abc import abstractclassmethod
 from sqlalchemy import create_engine
+from functools import lru_cache
+
 from .._config import _data_path
 
 trade_dates = ts.pro_api().trade_cal()
@@ -101,25 +103,40 @@ class CBData(Data):
         data_fields = ['ts_code', 'trade_date', 'pre_close', 'open','high',
                         'low', 'close','change', 'pct_chg', 'vol', 'amount',
                         'bond_value', 'bond_over_rate', 'cb_value', 'cb_over_rate']
+        basic_data = self.api.cb_basic(fields=['ts_code', 'stk_code'])
+        
+        data_fetch_error = False
+        fetch_count = 0
         while tmp_date <= end_date:
-            if trade_dates.loc[tmp_date.strftime('%Y%m%d'),'is_open']:
+            if not trade_dates.loc[tmp_date.strftime('%Y%m%d'),'is_open']:   ### is_trading_day
+                tmp_date += day
+                continue
+            try:
                 tmp_df = self.api.cb_daily(trade_date=tmp_date.strftime('%Y%m%d'), fields=data_fields)
-                ### get the corresponding stk daily bar data
-                basic_data = self.api.cb_basic(fields=['ts_code', 'stk_code'])
+                if len(tmp_df) == 0:
+                    raise 
+                data_fetch_error = False
+                fetch_count = 0
+            except:
+                data_fetch_error = True
+                fetch_count += 1
 
-                tmp_df = tmp_df.join(basic_data.set_index(keys='ts_code'), on='ts_code', how='left')
-                stk_daily = self.api.daily(trade_date=tmp_date.strftime('%Y%m%d'), 
-                                           ts_code=','.join(tmp_df.stk_code),
-                                           fields = data_fields[:11])
-                stk_daily.rename(columns={'ts_code':'stk_code'},inplace=True)
-                try:
-                    stk_daily.drop(columns=['trade_date'],inplace=True)
-                except:
-                    print(tmp_date)
-                    import pdb; pdb.set_trace()
-                tmp_df = pd.merge(tmp_df, stk_daily, on='stk_code', how='outer', suffixes=('', '_stk'))
-                df_list.append(tmp_df)
-            
+            if fetch_count >= 10: ### has failed 10 times
+                tmp_date += day
+                data_fetch_error = False
+                fetch_count = 0
+                continue
+
+            ### get the corresponding stk daily bar data
+            tmp_df = tmp_df.join(basic_data.set_index(keys='ts_code'), on='ts_code', how='left')
+            stk_daily = self.api.daily(trade_date=tmp_date.strftime('%Y%m%d'), 
+                                        ts_code=','.join(tmp_df.stk_code),
+                                        fields = data_fields[:11])
+            stk_daily.rename(columns={'ts_code':'stk_code'},inplace=True)
+            stk_daily.drop(columns=['trade_date'],inplace=True)
+            tmp_df = pd.merge(tmp_df, stk_daily, on='stk_code', how='outer', suffixes=('', '_stk'))
+            df_list.append(tmp_df)
+        
             tmp_date += day
 
         df = pd.concat(df_list, ignore_index=True)
