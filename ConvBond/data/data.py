@@ -13,24 +13,12 @@ import os
 import pandas as pd
 import tushare as ts
 import datetime as dt
-from typing import Union, List
 from abc import abstractclassmethod
 from sqlalchemy import create_engine
-from functools import lru_cache
 
+# from .data_utils import is_trading_day
 from .._config import _data_path
 
-trade_dates = ts.pro_api().trade_cal()
-trade_dates.set_index('cal_date', inplace=True)
-trade_dates.to_csv(f'{_data_path}/trading_calendar.csv')
-
-# def is_business_day(date):
-#     '''
-#     Function:
-#         Check if the given date is business date
-#     date: str, '20230101'
-#     '''
-#     return trade_dates.loc[date, 'is_open']
 
 class Data:
 
@@ -71,7 +59,7 @@ class CBData(Data):
         df = pd.read_sql(f'select {data_fields} from {table}', engine)
         return df
     
-    def cb_daily(self, start_date:str, end_date:str = f'{dt.date.today():%Y%m%d}'):
+    def cb_daily(self, date: str=f'{dt.date.today():%Y%m%d}', ** kwargs ):
         '''
         Function:
             Download daily data using pro_api. The data should be stored in format feather.
@@ -93,65 +81,60 @@ class CBData(Data):
             cb_over_rate:   转股溢价率(%)
             
         '''
-
-        start_date = dt.datetime.strptime(start_date, '%Y%m%d').date()
-        tmp_date = start_date
-        end_date = dt.datetime.strptime(end_date, '%Y%m%d').date()
-
-        day = dt.timedelta(days=1)
-        df_list = []
         data_fields = ['ts_code', 'trade_date', 'pre_close', 'open','high',
                         'low', 'close','change', 'pct_chg', 'vol', 'amount',
                         'bond_value', 'bond_over_rate', 'cb_value', 'cb_over_rate']
         basic_data = self.api.cb_basic(fields=['ts_code', 'stk_code'])
         
-        data_fetch_error = False
-        fetch_count = 0
-        while tmp_date <= end_date:
-            if not trade_dates.loc[tmp_date.strftime('%Y%m%d'),'is_open']:   ### is_trading_day
-                tmp_date += day
-                continue
-            try:
-                tmp_df = self.api.cb_daily(trade_date=tmp_date.strftime('%Y%m%d'), fields=data_fields)
-                if len(tmp_df) == 0:
-                    raise 
-                data_fetch_error = False
-                fetch_count = 0
-            except:
-                data_fetch_error = True
-                fetch_count += 1
-
-            if fetch_count >= 10: ### has failed 10 times
-                tmp_date += day
-                data_fetch_error = False
-                fetch_count = 0
-                continue
-
-            ### get the corresponding stk daily bar data
-            tmp_df = tmp_df.join(basic_data.set_index(keys='ts_code'), on='ts_code', how='left')
-            stk_daily = self.api.daily(trade_date=tmp_date.strftime('%Y%m%d'), 
-                                        ts_code=','.join(tmp_df.stk_code),
-                                        fields = data_fields[:11])
-            stk_daily.rename(columns={'ts_code':'stk_code'},inplace=True)
-            stk_daily.drop(columns=['trade_date'],inplace=True)
-            tmp_df = pd.merge(tmp_df, stk_daily, on='stk_code', how='outer', suffixes=('', '_stk'))
-            df_list.append(tmp_df)
+        append = kwargs.get('append', True)
+        result = 
+        if not is_trading_day(date):
+            return 
         
-            tmp_date += day
+        # while tmp_date <= end_date:
+        #     if not trade_dates.loc[tmp_date.strftime('%Y%m%d'),'is_open']:   ### is_trading_day
+        #         tmp_date += day
+        #         continue
+        #     try:
+        #         tmp_df = self.api.cb_daily(trade_date=tmp_date.strftime('%Y%m%d'), fields=data_fields)
+        #         if len(tmp_df) == 0:
+        #             raise 
+        #         data_fetch_error = False
+        #         fetch_count = 0
+        #     except:
+        #         data_fetch_error = True
+        #         fetch_count += 1
 
-        df = pd.concat(df_list, ignore_index=True)
-        ### save to feathers
-        file_name = f'{_data_path}/{self.data_type}/cb_daily.feather'
-        if os.path.exists(file_name):
-            #### check if the old_df already exists, if does, update the data
-            df.set_index(keys=['ts_code','trade_date'], inplace=True)
-            old_df = pd.read_feather(file_name)
-            old_df.set_index(keys=['ts_code','trade_date'], inplace=True)
-            index_duplicate = old_df.index.intersection(df.index)
-            old_df.drop(index=index_duplicate, inplace=True, errors='ignore')
-            pd.concat([old_df,df]).reset_index().to_feather(file_name)
-        else: 
-            df.to_feather(file_name)
+        #     if fetch_count >= 10: ### has failed 10 times
+        #         tmp_date += day
+        #         fetch_count = 0
+        #         continue
+
+        #     ### get the corresponding stk daily bar data
+        #     tmp_df = tmp_df.join(basic_data.set_index(keys='ts_code'), on='ts_code', how='left')
+        #     stk_daily = self.api.daily(trade_date=tmp_date.strftime('%Y%m%d'), 
+        #                                 ts_code=','.join(tmp_df.stk_code),
+        #                                 fields = data_fields[:11])
+        #     stk_daily.rename(columns={'ts_code':'stk_code'},inplace=True)
+        #     stk_daily.drop(columns=['trade_date'],inplace=True)
+        #     tmp_df = pd.merge(tmp_df, stk_daily, on='stk_code', how='outer', suffixes=('', '_stk'))
+        #     df_list.append(tmp_df)
+        
+        #     tmp_date += day
+
+        # df = pd.concat(df_list, ignore_index=True)
+        # ### save to feathers
+        # file_name = f'{_data_path}/{self.data_type}/cb_daily.feather'
+        # if os.path.exists(file_name):
+        #     #### check if the old_df already exists, if does, update the data
+        #     df.set_index(keys=['ts_code','trade_date'], inplace=True)
+        #     old_df = pd.read_feather(file_name)
+        #     old_df.set_index(keys=['ts_code','trade_date'], inplace=True)
+        #     index_duplicate = old_df.index.intersection(df.index)
+        #     old_df.drop(index=index_duplicate, inplace=True, errors='ignore')
+        #     pd.concat([old_df,df]).reset_index().to_feather(file_name)
+        # else: 
+        #     df.to_feather(file_name)
         
         return df
 

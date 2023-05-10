@@ -19,3 +19,4 @@ class TestConvBond(unittest.TestCase):
         data = CBData()
         # data.cb_basic()
         df = data.cb_daily(start_date='20190101')
+    
